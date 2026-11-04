@@ -1,36 +1,41 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# MediAI Care 🏥🤖
 
-## Getting Started
+> Multi-clinic appointment & operations platform integrated with a calibrated AI skin-lesion decision support system and RAG assistant.
 
-First, run the development server:
+[![Next.js 15](https://img.shields.io/badge/Next.js-15-black?style=flat-square&logo=next.js)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Supabase-4169E1?style=flat-square&logo=postgresql)](https://supabase.com)
+[![Prisma 6](https://img.shields.io/badge/Prisma-6-2D3748?style=flat-square&logo=prisma)](https://www.prisma.io)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+---
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 📌 Overview
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+**MediAI Care** is designed to modernize local clinic management—replacing legacy single-clinic systems with a scalable multi-tenant SaaS architecture. It serves as a clinical decision support framework featuring:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. **Multi-Clinic Core:** Online slot scheduling, receptionist walk-in token counters, doctor workspaces, and patient medical record tracking.
+2. **AI Decision Support:** Calibrated vision models (FastAPI + PyTorch) with quality gating, uncertainty abstention, and Grad-CAM attention heatmaps for skin-lesion screening.
+3. **RAG Health Assistant:** Grounded symptom triage and specialty routing using PostgreSQL `pgvector`.
 
-## Learn More
+> **⚠️ Disclaimer:** MediAI Care is strictly a clinical decision-support and workflow system. It does **not** provide autonomous medical diagnoses, clinical prescriptions, or dosage determinations.
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🏗️ Architecture & Structure
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The repository is structured as a single unified monorepo[cite: 1]:
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```text
+mediai-care/
+├── src/                        # Next.js 15 App Router (TypeScript)[cite: 1]
+│   ├── app/                    # Route handlers & multi-role dashboards[cite: 1]
+│   ├── components/             # Tailwind UI components[cite: 1]
+│   ├── lib/                    # Core utilities (DB, Auth, Time, RBAC)[cite: 1]
+│   └── server/                 # Business logic services & Zod validation[cite: 1]
+├── ai-service/                 # FastAPI Python Microservice[cite: 1]
+│   ├── app/                    # ML models, quality gate & RAG engine[cite: 1]
+│   └── requirements.txt        # Python dependency list[cite: 1]
+├── prisma/                     # Database schemas & migrations[cite: 1]
+└── docs/                       # Architecture plans & specifications[cite: 1]
