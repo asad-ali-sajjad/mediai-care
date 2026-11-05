@@ -1,15 +1,627 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")   // pooled connection at runtime
+  directUrl  = env("DIRECT_URL")     // direct connection for migrations
+  extensions = [vector, pg_trgm]     // pgvector (RAG), trigram (fast patient search)
+}
+
+// ═════════ Enums ═════════
+enum Role {
+  SUPER_ADMIN
+  CLINIC_ADMIN
+  RECEPTIONIST
+  DOCTOR
+  PATIENT
+}
+
+enum ApptStatus {
+  BOOKED
+  CHECKED_IN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum ApptSource {
+  ONLINE
+  RECEPTION
+  WALK_IN
+}
+
+enum ApptMode {
+  IN_PERSON
+  VIDEO
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  ONLINE
+  OTHER
+}
+
+enum PaymentKind {
+  PAYMENT
+  REFUND
+}
+
+enum WaitlistStatus {
+  WAITING
+  OFFERED
+  BOOKED
+  EXPIRED
+  CANCELLED
+}
+
+enum DocType {
+  REPORT
+  PRESCRIPTION
+  SKIN_IMAGE
+  OTHER
+}
+
+enum Channel {
+  EMAIL
+  SMS
+  WHATSAPP
+}
+
+enum NotifStatus {
+  QUEUED
+  SENT
+  FAILED
+  SKIPPED
+}
+
+enum FollowUpStatus {
+  OPEN
+  DONE
+  POSTPONED
+  OVERDUE
+}
+
+enum RiskBand {
+  LOW_CONCERN
+  REVIEW_RECOMMENDED
+  URGENT_REVIEW
+}
+
+enum AssessStatus {
+  REJECTED_QUALITY
+  PREDICTED
+  ABSTAINED
+  FAILED
+}
+
+enum ReviewDecision {
+  AGREE
+  OVERRIDE
+  UNCERTAIN
+  NEED_NEW_IMAGE
+  IN_PERSON_EXAM
+}
+
+enum ChatRole {
+  USER
+  ASSISTANT
+  TOOL
+}
+
+// ═════════ Tenancy and identity ═════════
+model Clinic {
+  id                   String   @id @default(cuid())
+  name                 String
+  slug                 String   @unique
+  phone                String?
+  email                String?
+  address              String?
+  city                 String?
+  timezone             String   @default("Asia/Karachi")
+  currency             String   @default("PKR")
+  locale               String   @default("en")
+  logoUrl              String?
+  brandColor           String?
+  cancelWindowHrs      Int      @default(2)    // patient may cancel until X hours before start
+  advanceBookingDays   Int      @default(30)   // how far ahead booking is allowed
+  minLeadMinutes       Int      @default(30)   // no booking closer than this to "now"
+  noShowGraceMinutes   Int      @default(15)   // auto no-show after start + grace
+  publicBookingEnabled Boolean  @default(true)
+  isActive             Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  users         User[]
+  doctors       Doctor[]
+  patients      Patient[]
+  appointments  Appointment[]
+  payments      Payment[]
+  notifications Notification[]
+  visits        Visit[]
+  followUps     FollowUp[]
+  documents     ClinicalDocument[]
+  consents      ConsentRecord[]
+  assessments   SkinAssessment[]
+  waitlist      WaitlistEntry[]
+  knowledgeDocs KnowledgeDoc[]
+}
+
+// SUPER_ADMIN and PATIENT users have clinicId = null (global accounts).
+// CLINIC_ADMIN, RECEPTIONIST and DOCTOR always belong to one clinic (enforced by CHECK).
+model User {
+  id                 String    @id @default(cuid())
+  clinicId           String?
+  role               Role
+  name               String
+  email              String?   @unique          // stored lowercase (CHECK)
+  phone              String?   @unique          // E.164, e.g. +923001234567 (CHECK)
+  passwordHash       String
+  isActive           Boolean   @default(true)
+  mustChangePassword Boolean   @default(false)
+  failedLogins       Int       @default(0)
+  lockedUntil        DateTime?
+  emailVerifiedAt    DateTime?
+  phoneVerifiedAt    DateTime?
+  locale             String    @default("en")
+  lastLoginAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  clinic         Clinic?              @relation(fields: [clinicId], references: [id])
+  doctor         Doctor?
+  patientRecords Patient[]
+  resetTokens    PasswordResetToken[]
+
+  @@index([clinicId, role])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique                  // store only the hash of the emailed token
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Specialization {
+  id       Int      @id @default(autoincrement())
+  name     String   @unique
+  isActive Boolean  @default(true)
+  doctors  Doctor[]
+}
+
+// ═════════ Doctors and scheduling ═════════
+model Doctor {
+  id               String   @id @default(cuid())
+  clinicId         String
+  userId           String   @unique
+  specializationId Int
+  qualification    String?
+  licenseNo        String?
+  experienceYears  Int?
+  bio              String?
+  photoUrl         String?
+  fee              Int      @default(0)        // PKR, whole rupees
+  slotMinutes      Int      @default(15)
+  videoEnabled     Boolean  @default(false)
+  acceptsOnline    Boolean  @default(true)     // visible for online booking
+  displayOrder     Int      @default(0)
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  clinic         Clinic           @relation(fields: [clinicId], references: [id])
+  user           User             @relation(fields: [userId], references: [id])
+  specialization Specialization   @relation(fields: [specializationId], references: [id])
+  schedules      DoctorSchedule[]
+  leaves         DoctorLeave[]
+  appointments   Appointment[]
+  visits         Visit[]
+  reviews        ClinicianReview[]
+  waitlist       WaitlistEntry[]
+
+  @@index([clinicId, specializationId])
+  @@index([clinicId, isActive])
+}
+
+model DoctorSchedule {
+  id        String  @id @default(cuid())
+  doctorId  String
+  weekday   Int                       // 0 = Sunday ... 6 = Saturday
+  startTime String                    // "09:00", clinic local time
+  endTime   String                    // "13:00"
+  isActive  Boolean @default(true)
+  doctor    Doctor  @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@unique([doctorId, weekday, startTime])
+  @@index([doctorId, weekday])
+}
+
+model DoctorLeave {
+  id        String   @id @default(cuid())
+  doctorId  String
+  startDate DateTime @db.Date
+  endDate   DateTime @db.Date
+  reason    String?
+  createdAt DateTime @default(now())
+  doctor    Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@index([doctorId, startDate, endDate])
+}
+
+// ═════════ Patients and appointments ═════════
+model Patient {
+  id             String    @id @default(cuid())
+  clinicId       String
+  userId         String?                      // null for walk-ins without an account
+  name           String
+  phone          String                       // E.164 (CHECK)
+  email          String?
+  gender         Gender?
+  dob            DateTime? @db.Date
+  address        String?
+  fileNo         String?                      // clinic's own record number
+  notes          String?                      // administrative notes only
+  notifyEmail    Boolean   @default(true)
+  notifySms      Boolean   @default(true)
+  notifyWhatsapp Boolean   @default(true)
+  deletedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  clinic       Clinic             @relation(fields: [clinicId], references: [id])
+  user         User?              @relation(fields: [userId], references: [id])
+  appointments Appointment[]
+  visits       Visit[]
+  followUps    FollowUp[]
+  documents    ClinicalDocument[]
+  consents     ConsentRecord[]
+  assessments  SkinAssessment[]
+  waitlist     WaitlistEntry[]
+
+  @@unique([clinicId, userId])
+  @@unique([clinicId, fileNo])
+  @@index([clinicId, phone])
+  @@index([clinicId, name])
+}
+
+model Appointment {
+  id                String     @id @default(cuid())
+  clinicId          String
+  doctorId          String
+  patientId         String
+  startsAt          DateTime                   // UTC instant
+  endsAt            DateTime
+  apptDate          DateTime   @db.Date        // clinic-local calendar date of startsAt
+  status            ApptStatus @default(BOOKED)
+  source            ApptSource @default(ONLINE)
+  mode              ApptMode   @default(IN_PERSON)
+  tokenNo           Int?                       // queue number for that doctor and day
+  reason            String?
+  fee               Int?                       // snapshot of doctor fee at booking time
+  videoRoom         String?
+  confirmedAt       DateTime?                  // patient confirmed via reminder link
+  checkedInAt       DateTime?
+  startedAt         DateTime?
+  completedAt       DateTime?
+  cancelledAt       DateTime?
+  noShowAt          DateTime?
+  cancelledBy       Role?
+  cancelReason      String?
+  rescheduledFromId String?
+  createdById       String?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  clinic          Clinic           @relation(fields: [clinicId], references: [id])
+  doctor          Doctor           @relation(fields: [doctorId], references: [id])
+  patient         Patient          @relation(fields: [patientId], references: [id])
+  rescheduledFrom Appointment?     @relation("Reschedule", fields: [rescheduledFromId], references: [id])
+  rescheduledTo   Appointment[]    @relation("Reschedule")
+  visit           Visit?
+  payments        Payment[]
+  notifications   Notification[]
+  assessments     SkinAssessment[]
+
+  @@unique([doctorId, apptDate, tokenNo])      // no duplicate tokens (NULLs allowed)
+  @@index([clinicId, apptDate, status])
+  @@index([doctorId, apptDate])
+  @@index([patientId, startsAt])
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  clinicId      String
+  appointmentId String
+  amount        Int                              // positive PKR; kind says payment or refund
+  kind          PaymentKind   @default(PAYMENT)
+  method        PaymentMethod @default(CASH)
+  receivedById  String?
+  note          String?
+  createdAt     DateTime      @default(now())
+
+  clinic      Clinic      @relation(fields: [clinicId], references: [id])
+  appointment Appointment @relation(fields: [appointmentId], references: [id])
+
+  @@index([clinicId, createdAt])
+  @@index([appointmentId])
+}
+
+model QueueCounter {
+  doctorId String
+  date     DateTime @db.Date
+  last     Int      @default(0)
+
+  @@id([doctorId, date])
+}
+
+model WaitlistEntry {
+  id            String         @id @default(cuid())
+  clinicId      String
+  doctorId      String
+  patientId     String
+  preferredDate DateTime       @db.Date
+  status        WaitlistStatus @default(WAITING)
+  offeredAt     DateTime?
+  createdAt     DateTime       @default(now())
+
+  clinic  Clinic  @relation(fields: [clinicId], references: [id])
+  doctor  Doctor  @relation(fields: [doctorId], references: [id])
+  patient Patient @relation(fields: [patientId], references: [id])
+
+  @@index([doctorId, preferredDate, status])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  clinicId   String?
+  actorId    String?
+  action     String                            // e.g. "appointment.cancel"
+  targetType String
+  targetId   String
+  meta       Json?
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  @@index([clinicId, createdAt])
+  @@index([targetType, targetId])
+  @@index([actorId, createdAt])
+}
+
+// ═════════ Notifications (outbox) ═════════
+model Notification {
+  id            String      @id @default(cuid())
+  clinicId      String
+  userId        String?
+  appointmentId String?
+  channel       Channel
+  template      String                         // "appt_confirmation", "reminder_24h", ...
+  locale        String      @default("en")
+  toAddress     String
+  payload       Json?
+  dedupeKey     String      @unique            // "reminder_24h:{appointmentId}"
+  status        NotifStatus @default(QUEUED)
+  attempts      Int         @default(0)
+  providerId    String?
+  error         String?
+  scheduledFor  DateTime    @default(now())    // also used as the next retry time
+  sentAt        DateTime?
+  createdAt     DateTime    @default(now())
+
+  clinic      Clinic       @relation(fields: [clinicId], references: [id])
+  appointment Appointment? @relation(fields: [appointmentId], references: [id])
+
+  @@index([clinicId, status])
+}
+
+// ═════════ Clinical records ═════════
+model Visit {
+  id            String   @id @default(cuid())
+  clinicId      String
+  appointmentId String   @unique
+  patientId     String
+  doctorId      String
+  notes         String?
+  diagnosisText String?                        // doctor-authored only, never AI
+  advice        String?
+  vitals        Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  clinic      Clinic             @relation(fields: [clinicId], references: [id])
+  appointment Appointment        @relation(fields: [appointmentId], references: [id])
+  patient     Patient            @relation(fields: [patientId], references: [id])
+  doctor      Doctor             @relation(fields: [doctorId], references: [id])
+  documents   ClinicalDocument[]
+  followUps   FollowUp[]
+
+  @@index([patientId, createdAt])
+  @@index([doctorId, createdAt])
+}
+
+model FollowUp {
+  id        String         @id @default(cuid())
+  clinicId  String
+  visitId   String
+  patientId String
+  dueDate   DateTime       @db.Date
+  status    FollowUpStatus @default(OPEN)
+  note      String?
+  createdAt DateTime       @default(now())
+
+  clinic  Clinic  @relation(fields: [clinicId], references: [id])
+  visit   Visit   @relation(fields: [visitId], references: [id])
+  patient Patient @relation(fields: [patientId], references: [id])
+
+  @@index([clinicId, status, dueDate])
+}
+
+model ClinicalDocument {
+  id           String    @id @default(cuid())
+  clinicId     String
+  patientId    String
+  visitId      String?
+  type         DocType
+  fileName     String
+  mimeType     String
+  sizeBytes    Int
+  storagePath  String                         // private bucket path; access via signed URL only
+  checksum     String?
+  uploadedById String
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  clinic  Clinic  @relation(fields: [clinicId], references: [id])
+  patient Patient @relation(fields: [patientId], references: [id])
+  visit   Visit?  @relation(fields: [visitId], references: [id])
+
+  @@index([patientId, type])
+  @@index([clinicId, createdAt])
+}
+
+model ConsentRecord {
+  id          String    @id @default(cuid())
+  clinicId    String
+  patientId   String
+  purpose     String                          // "skin_analysis", "research_retention"
+  version     String
+  ip          String?
+  grantedAt   DateTime  @default(now())
+  withdrawnAt DateTime?
+
+  clinic  Clinic  @relation(fields: [clinicId], references: [id])
+  patient Patient @relation(fields: [patientId], references: [id])
+
+  @@index([patientId, purpose])
+}
+
+// ═════════ Skin-lesion AI (research module) ═════════
+model ModelVersion {
+  id          String   @id @default(cuid())
+  name        String                           // "effnet-b0"
+  version     String                           // "1.2.0"
+  checksum    String
+  thresholds  Json                             // temperature, abstention, risk thresholds
+  metrics     Json?                            // test metrics snapshot for the model card
+  isActive    Boolean  @default(false)         // at most ONE active (partial unique index)
+  createdAt   DateTime @default(now())
+
+  assessments SkinAssessment[]
+
+  @@unique([name, version])
+}
+
+model SkinAssessment {
+  id             String       @id @default(cuid())
+  clinicId       String
+  patientId      String
+  appointmentId  String?
+  modelVersionId String?
+  createdById    String?
+  imagePath      String
+  imageHash      String
+  qualityPassed  Boolean
+  qualityInfo    Json?
+  probabilities  Json?                          // {"nv":0.12,"mel":0.61,...}
+  topClass       String?
+  confidence     Float?                         // calibrated
+  entropy        Float?
+  riskBand       RiskBand?
+  status         AssessStatus
+  gradcamPath    String?
+  metadata       Json?                          // age, sex, anatomical site
+  latencyMs      Int?
+  createdAt      DateTime     @default(now())
+
+  clinic       Clinic            @relation(fields: [clinicId], references: [id])
+  patient      Patient           @relation(fields: [patientId], references: [id])
+  appointment  Appointment?      @relation(fields: [appointmentId], references: [id])
+  modelVersion ModelVersion?     @relation(fields: [modelVersionId], references: [id])
+  reviews      ClinicianReview[]
+
+  @@index([clinicId, status, createdAt])
+  @@index([patientId, createdAt])
+  @@index([imageHash])
+}
+
+model ClinicianReview {
+  id           String         @id @default(cuid())
+  assessmentId String
+  doctorId     String
+  decision     ReviewDecision
+  comments     String?
+  reviewedAt   DateTime       @default(now())
+
+  assessment SkinAssessment @relation(fields: [assessmentId], references: [id])
+  doctor     Doctor         @relation(fields: [doctorId], references: [id])
+
+  @@index([assessmentId])
+}
+
+// ═════════ RAG assistant ═════════
+model KnowledgeDoc {
+  id        String   @id @default(cuid())
+  clinicId  String?                            // null = platform-wide
+  title     String
+  source    String?
+  version   Int      @default(1)
+  approved  Boolean  @default(false)
+  archived  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  clinic Clinic?          @relation(fields: [clinicId], references: [id])
+  chunks KnowledgeChunk[]
+
+  @@index([clinicId, approved])
+}
+
+model KnowledgeChunk {
+  id        String                       @id @default(cuid())
+  docId     String
+  ordinal   Int
+  content   String
+  embedding Unsupported("vector(1024)")?          // read and write with raw SQL
+  doc       KnowledgeDoc                 @relation(fields: [docId], references: [id], onDelete: Cascade)
+
+  @@unique([docId, ordinal])
+}
+
+model ChatSession {
+  id        String   @id @default(cuid())
+  userId    String?
+  clinicId  String?
+  createdAt DateTime @default(now())
+  messages  ChatMessage[]
+
+  @@index([userId, createdAt])
+}
+
+model ChatMessage {
+  id            String      @id @default(cuid())
+  sessionId     String
+  role          ChatRole
+  content       String
+  sources       Json?                          // retrieved chunk ids
+  toolCalls     Json?
+  safetyFlags   Json?
+  promptVersion String?
+  createdAt     DateTime    @default(now())
+  session       ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
 }

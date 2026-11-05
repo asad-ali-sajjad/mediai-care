@@ -1,0 +1,15 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16      # Postgres 16 with pgvector preinstalled
+    environment:
+      POSTGRES_USER: mediai
+      POSTGRES_PASSWORD: mediai
+      POSTGRES_DB: mediai
+    ports: ["5433:5432"]               # 5433 avoids clashing with local Postgres
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mediai"]
+      interval: 5s
+      retries: 10
+volumes:
+  pgdata:
