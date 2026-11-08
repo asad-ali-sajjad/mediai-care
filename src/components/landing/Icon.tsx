@@ -1,7 +1,19 @@
 import React from "react";
 
+export type IconName =
+  | "shield"
+  | "check"
+  | "lock"
+  | "calendar"
+  | "file"
+  | "eye"
+  | "pulse"
+  | "clock"
+  | "close"
+  | "menu";
+
 interface IconProps extends React.SVGProps<SVGSVGElement> {
-  name: string;
+  name: IconName | string;
 }
 
 export function Icon({ name, className = "h-5 w-5", ...props }: IconProps) {
