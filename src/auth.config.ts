@@ -1,23 +1,38 @@
 import type { NextAuthConfig } from "next-auth";
 
-export const authConfig = {
-  pages: { signIn: "/login" },
-  session: { strategy: "jwt", maxAge: 60 * 60 * 8 }, // 8-hour sessions
-  providers: [], // Credentials provider added in auth.ts
+export const authConfig: NextAuthConfig = {
+  providers: [],
   callbacks: {
-    jwt({ token, user }) {
+    async jwt({ token, user }) {
       if (user) {
-        token.uid = user.id!;
-        token.role = user.role;
-        token.clinicId = user.clinicId ?? null;
+        const u = user as { id?: string; role?: string; clinicId?: string | null };
+        const t = token as { uid?: string; role?: string; clinicId?: string | null };
+        t.uid = u.id;
+        t.role = u.role;
+        t.clinicId = u.clinicId;
       }
       return token;
     },
-    session({ session, token }) {
-      session.user.id = token.uid;
-      session.user.role = token.role;
-      session.user.clinicId = token.clinicId;
+    async session({ session, token }) {
+      if (session.user && token) {
+        const sUser = session.user as {
+          id?: string;
+          role?: string;
+          clinicId?: string | null;
+        };
+        const t = token as { uid?: string; sub?: string; role?: string; clinicId?: string | null };
+
+        sUser.id = t.uid ?? t.sub ?? "";
+        if (t.role !== undefined) {
+          sUser.role = t.role;
+        }
+        if (t.clinicId !== undefined) {
+          sUser.clinicId = t.clinicId;
+        }
+      }
       return session;
     },
   },
-} satisfies NextAuthConfig;
+};
+
+export default authConfig;

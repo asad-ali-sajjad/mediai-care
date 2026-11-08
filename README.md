@@ -126,7 +126,7 @@ Create a `.env` file in the root directory:
 ```env
 DATABASE_URL="postgresql://user:password@host:6543/postgres?pgbouncer=true"
 DIRECT_URL="postgresql://user:password@host:5432/postgres"
-AUTH_SECRET="your-32-byte-base64-secret"
+BETTER_AUTH_SECRET="your-32-byte-base64-secret"
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
 ALLOW_SEED="yes"
 ```
