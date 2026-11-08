@@ -1,62 +1,31 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth, signOut } from "@/auth";
-import { Icon, type IconName } from "@/components/landing/Icon";
+import { db } from "@/lib/db";
+import type { Prisma } from "@prisma/client";
+import { Icon } from "@/components/landing/Icon";
+import { PatientView } from "./patient-view";
+import { DoctorView } from "./doctor-view";
 
-const serif = "font-[family-name:var(--font-serif)]";
+export const dynamic = "force-dynamic";
 
-const roleLabels: Record<string, string> = {
-  SUPER_ADMIN: "Platform administrator",
-  CLINIC_ADMIN: "Clinic administrator",
-  RECEPTIONIST: "Receptionist",
-  DOCTOR: "Doctor",
-  PATIENT: "Patient",
-};
+type PatientAppointment = Prisma.AppointmentGetPayload<{
+  include: {
+    doctor: {
+      select: {
+        qualification: true;
+        clinic: { select: { name: true } };
+        specialization: { select: { name: true } };
+      };
+    };
+  };
+}>;
 
-// Mirrors the RBAC matrix in the README.
-const workspaces: {
-  href: string;
-  title: string;
-  text: string;
-  icon: IconName;
-  roles: string[];
-}[] = [
-  {
-    href: "/super",
-    title: "Platform management",
-    text: "Manage clinics and platform-wide settings.",
-    icon: "shield",
-    roles: ["SUPER_ADMIN"],
-  },
-  {
-    href: "/admin",
-    title: "Clinic admin",
-    text: "Manage staff, roles and clinic settings.",
-    icon: "users",
-    roles: ["SUPER_ADMIN", "CLINIC_ADMIN"],
-  },
-  {
-    href: "/reception",
-    title: "Reception & queue",
-    text: "Register walk-ins and manage today's queue.",
-    icon: "clipboard",
-    roles: ["SUPER_ADMIN", "CLINIC_ADMIN", "RECEPTIONIST"],
-  },
-  {
-    href: "/doctor",
-    title: "Clinical workspace",
-    text: "Schedules, patient history and consultation notes.",
-    icon: "pulse",
-    roles: ["DOCTOR"],
-  },
-  {
-    href: "/patient",
-    title: "Patient portal",
-    text: "Your appointments, visits and files.",
-    icon: "calendar",
-    roles: ["PATIENT"],
-  },
-];
+type DoctorAppointment = Prisma.AppointmentGetPayload<{
+  include: {
+    patient: { select: { name: true; phone: true } };
+  };
+}>;
 
 function initials(name?: string | null, fallback?: string | null) {
   const source = (name || fallback || "?").trim();
@@ -71,19 +40,48 @@ export default async function DashboardPage() {
   if (!session?.user) redirect("/login");
 
   const user = session.user;
-  const role = String(user.role ?? "");
-  const roleLabel = roleLabels[role] ?? "Staff";
-  const available = workspaces.filter((w) => w.roles.includes(role));
 
-  const details: [string, string][] = [
-    ["Name", user.name || "Not set"],
-    ["Email", user.email || "Not set"],
-    ["Role", roleLabel],
-    ["Clinic", user.clinicId ? String(user.clinicId) : "All clinics"],
-  ];
+  let patientAppointments: PatientAppointment[] = [];
+  let doctorAppointments: DoctorAppointment[] = [];
+
+  if (user.role === "PATIENT") {
+    const patient = await db.patient.findFirst({
+      where: { userId: user.id },
+    });
+
+    if (patient) {
+      patientAppointments = await db.appointment.findMany({
+        where: { patientId: patient.id },
+        include: {
+          doctor: {
+            select: {
+              qualification: true,
+              clinic: { select: { name: true } },
+              specialization: { select: { name: true } },
+            },
+          },
+        },
+        orderBy: { startsAt: "desc" },
+      });
+    }
+  } else if (user.role === "DOCTOR") {
+    const doctor = await db.doctor.findFirst({
+      where: { userId: user.id },
+    });
+
+    if (doctor) {
+      doctorAppointments = await db.appointment.findMany({
+        where: { doctorId: doctor.id },
+        include: {
+          patient: { select: { name: true, phone: true } },
+        },
+        orderBy: { startsAt: "asc" },
+      });
+    }
+  }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-slate-50/50">
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-6">
           <Link href="/" className="flex items-center gap-2.5">
@@ -111,82 +109,35 @@ export default async function DashboardPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl px-6 py-12">
-        <div className="flex items-center gap-4">
+      <main className="mx-auto max-w-5xl space-y-8 px-6 py-10">
+        <div className="flex items-center gap-4 border-b border-slate-200 pb-6">
           <span
             aria-hidden="true"
             className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-teal-800 text-lg font-semibold text-white"
           >
             {initials(user.name, user.email)}
           </span>
-          <div className="min-w-0">
-            <h1 className={`${serif} truncate text-3xl font-semibold text-slate-900`}>
-              Welcome{user.name ? `, ${user.name}` : ""}
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+              MediAI Care Dashboard
             </h1>
             <p className="mt-1 text-sm text-slate-600">
-              Signed in as {roleLabel.toLowerCase()}.
+              Logged in as <span className="font-semibold text-slate-800">{user.name || "User"}</span> ({user.role})
             </p>
           </div>
         </div>
 
-        <section aria-labelledby="workspaces" className="mt-12">
-          <h2 id="workspaces" className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-            Your workspaces
-          </h2>
+        {user.role === "PATIENT" && <PatientView appointments={patientAppointments} />}
+        {user.role === "DOCTOR" && <DoctorView appointments={doctorAppointments} />}
 
-          {available.length > 0 ? (
-            <ul className="mt-4 grid gap-4 sm:grid-cols-2">
-              {available.map((w) => (
-                <li key={w.href}>
-                  <Link
-                    href={w.href}
-                    className="group flex h-full gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-colors hover:border-teal-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:ring-offset-2"
-                  >
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-teal-50 text-teal-800">
-                      <Icon name={w.icon} className="h-5 w-5" />
-                    </span>
-                    <span className="flex-1">
-                      <span className="block font-semibold text-slate-900">{w.title}</span>
-                      <span className="mt-1 block text-sm leading-relaxed text-slate-600">
-                        {w.text}
-                      </span>
-                    </span>
-                    <Icon
-                      name="arrow"
-                      className="mt-1 h-4 w-4 shrink-0 text-slate-400 transition-colors group-hover:text-teal-800"
-                    />
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-4 rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-600">
-              No workspaces are available for your account yet. Please contact
-              your clinic administrator.
+        {user.role !== "PATIENT" && user.role !== "DOCTOR" && (
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-bold text-slate-900">Administrative Overview</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Clinic and platform settings can be managed via high-level admin portals.
             </p>
-          )}
-        </section>
-
-        <section aria-labelledby="account" className="mt-12">
-          <h2 id="account" className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-            Account
-          </h2>
-          <dl className="mt-4 divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white">
-            {details.map(([label, value]) => (
-              <div key={label} className="grid gap-1 px-5 py-4 sm:grid-cols-3 sm:gap-4">
-                <dt className="text-sm text-slate-500">{label}</dt>
-                <dd className="break-all text-sm font-medium text-slate-900 sm:col-span-2">
-                  {value}
-                </dd>
-              </div>
-            ))}
-          </dl>
-          <p className="mt-3 flex items-start gap-2 text-xs leading-relaxed text-slate-500">
-            <Icon name="lock" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            Your access is limited to your role. Sign-in activity is recorded in
-            a secure audit log.
-          </p>
-        </section>
+          </div>
+        )}
       </main>
     </div>
   );
