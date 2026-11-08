@@ -22,6 +22,13 @@ export const metadata: Metadata = {
   title: "MediAI Care — Clinic Appointments & Decision Support",
   description:
     "Multi-clinic appointment booking, walk-in queues and clinician-reviewed AI decision support for local medical centers.",
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+    ],
+    shortcut: "/icon.svg",
+    apple: "/icon.svg",
+  },
 };
 
 export default function RootLayout({
