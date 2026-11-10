@@ -74,7 +74,7 @@ export default function Home() {
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
                 <Link
-                  href="/book"
+                  href="/doctors"
                   className="rounded-lg bg-teal-800 px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-teal-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:ring-offset-2"
                 >
                   Book an appointment
@@ -224,7 +224,7 @@ export default function Home() {
               </p>
             </div>
             <Link
-              href="/book"
+              href="/doctors"
               className="rounded-lg bg-white px-6 py-3 text-sm font-semibold text-teal-900 transition-colors hover:bg-teal-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-teal-900"
             >
               Find a doctor
@@ -233,43 +233,137 @@ export default function Home() {
         </section>
       </main>
 
-      <footer className="border-t border-slate-200 bg-white">
-        <div className="mx-auto max-w-6xl px-6 py-10">
-          <div className="flex flex-col justify-between gap-6 md:flex-row">
-            <div className="max-w-sm">
-              <div className="flex items-center gap-2">
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-800 text-white">
-                  <Icon name="pulse" className="h-4 w-4" />
+      {/* Upgraded Modern Footer */}
+      <footer className="border-t border-slate-800 bg-slate-900 text-slate-400">
+        <div className="mx-auto max-w-6xl px-6 pt-16 pb-12">
+          {/* Main Footer Grid */}
+          <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-5 lg:gap-8">
+            {/* Brand & System Status */}
+            <div className="space-y-4 lg:col-span-2">
+              <Link href="/" className="inline-flex items-center gap-2.5">
+                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-600 text-white shadow-sm">
+                  <Icon name="pulse" className="h-5 w-5" />
                 </span>
-                <span className="font-semibold text-slate-900">MediAI Care</span>
+                <span className="text-xl font-bold tracking-tight text-white">
+                  MediAI <span className="text-teal-400">Care</span>
+                </span>
+              </Link>
+              <p className="max-w-sm text-sm leading-relaxed text-slate-400">
+                Multi-clinic management and clinician decision-support platform.
+                Streamlining patient intake, walk-in queues, and consultation workflows.
+              </p>
+
+              {/* Status Badge */}
+              <div className="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-800/80 px-3.5 py-1.5 text-xs text-slate-300">
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
+                </span>
+                <span>All Clinic Systems Operational</span>
               </div>
-              <p className="mt-3 text-sm leading-relaxed text-slate-600">
-                Appointment and decision-support platform for local medical
-                centers.
+            </div>
+
+            {/* Column 1: Patient Care */}
+            <div>
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-200">
+                Patient Care
+              </h3>
+              <ul className="mt-4 space-y-2.5 text-sm">
+                <li>
+                  <Link href="/doctors" className="transition-colors hover:text-teal-400">
+                    Find &amp; Book Doctor
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/dashboard" className="transition-colors hover:text-teal-400">
+                    Patient Portal
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/assistant" className="transition-colors hover:text-teal-400">
+                    Triage Assistant
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/login" className="transition-colors hover:text-teal-400">
+                    Account Sign In
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            {/* Column 2: Staff Workspaces */}
+            <div>
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-200">
+                Staff Workspaces
+              </h3>
+              <ul className="mt-4 space-y-2.5 text-sm">
+                <li>
+                  <Link href="/doctor" className="transition-colors hover:text-teal-400">
+                    Doctor Workspace
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/reception" className="transition-colors hover:text-teal-400">
+                    Reception &amp; Queue
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/admin" className="transition-colors hover:text-teal-400">
+                    Clinic Management
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/super" className="transition-colors hover:text-teal-400">
+                    Platform Admin
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            {/* Column 3: Security & Trust */}
+            <div>
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-200">
+                Security &amp; Trust
+              </h3>
+              <ul className="mt-4 space-y-2.5 text-sm">
+                <li className="flex items-center gap-2 text-slate-400">
+                  <Icon name="lock" className="h-4 w-4 text-teal-400 shrink-0" />
+                  <span>Isolated Clinic DBs</span>
+                </li>
+                <li className="flex items-center gap-2 text-slate-400">
+                  <Icon name="file" className="h-4 w-4 text-teal-400 shrink-0" />
+                  <span>Audit Trail Logging</span>
+                </li>
+                <li className="flex items-center gap-2 text-slate-400">
+                  <Icon name="eye" className="h-4 w-4 text-teal-400 shrink-0" />
+                  <span>Clinician Review Queue</span>
+                </li>
+                <li className="flex items-center gap-2 text-slate-400">
+                  <Icon name="shield" className="h-4 w-4 text-teal-400 shrink-0" />
+                  <span>Role-Based Access</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Emergency Notice Card */}
+          <div className="mt-12 rounded-xl border border-rose-900/50 bg-rose-950/30 p-4 text-xs text-rose-200">
+            <div className="flex items-start gap-3">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-rose-600 font-bold text-white text-[10px]">
+                !
+              </span>
+              <p className="leading-relaxed">
+                <strong className="font-semibold text-rose-100">Medical Emergency Disclaimer:</strong> If you are experiencing a medical emergency, severe symptoms, or acute pain, do not use this website. Immediately call your local emergency hotline (e.g., <span className="font-semibold underline">Rescue 1122</span>) or proceed directly to the nearest hospital emergency department.
               </p>
             </div>
-            <nav aria-label="Footer" className="flex gap-10 text-sm">
-              <ul className="space-y-2">
-                <li><Link href="/book" className="text-slate-600 hover:text-teal-800">Book appointment</Link></li>
-                <li><Link href="/assistant" className="text-slate-600 hover:text-teal-800">Triage assistant</Link></li>
-                <li><Link href="/login" className="text-slate-600 hover:text-teal-800">Sign in</Link></li>
-              </ul>
-              <ul className="space-y-2">
-                <li><Link href="/doctor" className="text-slate-600 hover:text-teal-800">Doctor portal</Link></li>
-                <li><Link href="/reception" className="text-slate-600 hover:text-teal-800">Reception</Link></li>
-                <li><Link href="/patient" className="text-slate-600 hover:text-teal-800">Patient portal</Link></li>
-              </ul>
-            </nav>
           </div>
-          <div className="mt-8 space-y-2 border-t border-slate-200 pt-6 text-xs leading-relaxed text-slate-500">
-            <p>
-              <strong className="font-semibold text-slate-700">In an emergency</strong>, do not
-              use this website. Call your local emergency number (for example, Rescue 1122) or go to
-              the nearest hospital.
-            </p>
-            <p>
-              © 2026 MediAI Care. Decision-support platform only; it does not provide
-              autonomous diagnosis.
+
+          {/* Legal & Copyright Bottom Bar */}
+          <div className="mt-8 flex flex-col items-center justify-between gap-4 border-t border-slate-800 pt-8 text-xs text-slate-500 sm:flex-row">
+            <p>© 2026 MediAI Care. All rights reserved.</p>
+            <p className="text-center sm:text-right">
+              Decision-support platform only — does not provide autonomous medical diagnosis.
             </p>
           </div>
         </div>

@@ -1,6 +1,12 @@
 import type { NextAuthConfig } from "next-auth";
 
 export const authConfig: NextAuthConfig = {
+  trustHost: true,
+  secret:
+    process.env.AUTH_SECRET ||
+    process.env.NEXTAUTH_SECRET ||
+    process.env.BETTER_AUTH_SECRET ||
+    "fallback_development_secret",
   providers: [],
   callbacks: {
     async jwt({ token, user }) {

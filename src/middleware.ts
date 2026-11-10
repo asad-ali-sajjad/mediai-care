@@ -30,7 +30,7 @@ export default auth((req) => {
   }
 });
 
-// Skip static assets, API endpoints, and Next.js internal files
+// Skip static assets, API endpoints, SVG icons, and Next.js internal files
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|icon.svg).*)"],
 };
